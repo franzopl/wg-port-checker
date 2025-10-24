@@ -1,5 +1,4 @@
-import subprocess
-import re
+import socket
 import requests
 import time
 from pathlib import Path
@@ -23,6 +22,8 @@ def load_env():
 def save_env(host, username, password):
     """Save qBittorrent settings to .env file."""
     config = configparser.ConfigParser()
+    if ENV_FILE.exists():
+        config.read(ENV_FILE)
     config['qBittorrent'] = {
         'QB_HOST': host,
         'QB_USERNAME': username,
@@ -40,35 +41,54 @@ def prompt_for_credentials():
     save_env(host, username, password)
     return host, username, password
 
-def get_forwarded_port():
-    """Run port-checker.py to detect the forwarded port."""
-    try:
-        result = subprocess.run(['python', 'port-checker.py'], capture_output=True, text=True, check=True)
-        output = result.stdout
-        match = re.search(r'The forwarded port is: (\d+)', output)
-        if match:
-            port = int(match.group(1))
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Detected forwarded port: {port}")
-            return port
-        else:
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Could not find mapped port in port-checker.py output: {output}")
-            return None
-    except subprocess.CalledProcessError as e:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error running port-checker.py: {e.stderr}")
-        return None
-    except FileNotFoundError:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] port-checker.py not found. Ensure it is in the same directory.")
-        return None
+def get_forwarded_port(gateway='10.2.0.1', protocol='udp', suggested_public_port=0, private_port=0, lifetime=60):
+    """Detect the forwarded port using NAT-PMP."""
+    if protocol.lower() == 'udp':
+        op = 1
+    elif protocol.lower() == 'tcp':
+        op = 2
+    else:
+        raise ValueError("Protocol must be 'udp' or 'tcp'")
 
-def renew_natpmp_mapping():
-    """Explicitly renew NAT-PMP mapping for UDP."""
+    # Build the request packet
+    packet = bytes([0, op]) + bytes([0] * 2) + private_port.to_bytes(2, 'big') + suggested_public_port.to_bytes(2, 'big') + lifetime.to_bytes(4, 'big')
+
+    # Create UDP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(5)  # Timeout for response
+
     try:
-        result = subprocess.run(['natpmpc', '-g', '10.2.0.1', '-a', '1', '0', 'udp', '60'], capture_output=True, text=True, check=True)
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] NAT-PMP mapping renewed successfully: {result.stdout.strip()}")
-    except subprocess.CalledProcessError as e:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error renewing NAT-PMP mapping: {e.stderr}")
-    except FileNotFoundError:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] natpmpc not found. Please install it (e.g., sudo apt install natpmpc).")
+        # Send request to gateway on port 5351
+        sock.sendto(packet, (gateway, 5351))
+
+        # Receive response
+        data, addr = sock.recvfrom(1024)
+
+        # Parse response
+        if len(data) < 16:
+            raise Exception("Response too short")
+
+        version = data[0]
+        resp_op = data[1]
+        result = int.from_bytes(data[2:4], 'big')
+        epoch = int.from_bytes(data[4:8], 'big')
+        returned_private_port = int.from_bytes(data[8:10], 'big')
+        public_port = int.from_bytes(data[10:12], 'big')
+        returned_lifetime = int.from_bytes(data[12:16], 'big')
+
+        if version != 0 or resp_op != (128 + op):
+            raise Exception("Invalid response format")
+
+        if result != 0:
+            raise Exception(f"NAT-PMP error code: {result}")
+
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Detected forwarded port: {public_port}")
+        return public_port
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error detecting forwarded port: {e}")
+        return None
+    finally:
+        sock.close()
 
 def set_qbittorrent_port(port, host, username, password):
     """Set the listening port in qBittorrent."""
@@ -118,8 +138,8 @@ def get_current_qbittorrent_port(host, username, password):
         return None
 
 if __name__ == "__main__":
-    print("This script uses port-checker.py to detect the forwarded WireGuard port and updates qBittorrent.")
-    print("Ensure port-checker.py is in the same directory and you are connected to the VPN.")
+    print("This script detects the forwarded WireGuard port using NAT-PMP and updates qBittorrent.")
+    print("Ensure you are connected to the VPN with NAT-PMP enabled (e.g., ProtonVPN).")
 
     # Load or prompt for credentials
     credentials = load_env()
@@ -135,9 +155,6 @@ if __name__ == "__main__":
     try:
         while True:
             print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting new loop iteration")
-            # Renew NAT-PMP mapping to ensure fresh port
-            renew_natpmp_mapping()
-            
             # Get the forwarded port
             port = get_forwarded_port()
             if port:

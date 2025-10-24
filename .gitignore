@@ -1,1 +1,5 @@
 .env
+.venv
+build
+dist
+qbittorrent_port_updater.spec
