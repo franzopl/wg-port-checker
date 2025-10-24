@@ -1,3 +1,185 @@
+# Atualizador de Porta do qBittorrent
+
+Este projeto contém um script Python (`qbittorrent_port_updater.py`) que detecta a porta redirecionada de uma VPN WireGuard (como ProtonVPN) usando o script `port-checker.py` e atualiza a porta de escuta do qBittorrent para corresponder a ela. O script executa em um loop, verificando a porta a cada 45 segundos e atualizando o qBittorrent se necessário. Este README fornece instruções para configurar e executar o script no **Windows** em português brasileiro.
+
+## Pré-requisitos
+
+Antes de executar o script, certifique-se de ter:
+
+- **Python 3.x**: Versão 3.9 ou superior recomendada.
+- **qBittorrent**: Instalado com a interface web (Web UI) ativada.
+- **VPN WireGuard**: Configurada com NAT-PMP ou redirecionamento de porta ativado (ex.: ProtonVPN).
+- **port-checker.py**: Um script que detecta a porta redirecionada da VPN e exibe `The forwarded port is: <porta>`.
+
+## Instalação no Windows
+
+Siga estas etapas para instalar as dependências e executar o script no Windows.
+
+### 1. Instalar o Python
+1. **Baixar o Python**:
+   - Acesse [python.org](https://www.python.org/downloads/windows/) ou instale pelo Microsoft Store.
+   - Escolha Python 3.9 ou superior (ex.: Python 3.11).
+2. **Instalar o Python**:
+   - Execute o instalador.
+   - Marque a opção **"Add Python to PATH"** durante a instalação.
+   - Verifique a instalação abrindo o Prompt de Comando ou PowerShell e executando:
+     ```
+     python --version
+     ```
+     Você deve ver a versão do Python (ex.: `Python 3.11.0`).
+3. **Comando Alternativo**:
+   - Se `python` não funcionar, tente `py` ou `python3`. O script usa `sys.executable` para lidar com isso automaticamente.
+
+### 2. Instalar Bibliotecas Python Necessárias
+O script requer a biblioteca `requests`. As bibliotecas `configparser` e `pathlib` já estão incluídas na biblioteca padrão do Python.
+
+1. Abra o Prompt de Comando ou PowerShell.
+2. Instale a biblioteca `requests` usando pip:
+   ```
+   pip install requests
+   ```
+3. Verifique a instalação:
+   ```
+   pip show requests
+   ```
+   Você deve ver detalhes sobre o pacote `requests` instalado.
+
+### 3. Instalar o natpmpc (Opcional)
+O script chama o `natpmpc` para renovar mapeamentos NAT-PMP, mas isso só é necessário se o seu `port-checker.py` depende do `natpmpc`. Se o `port-checker.py` detecta a porta de forma independente (ex.: via API da VPN), pule esta etapa.
+
+1. **Baixar o libnatpmp**:
+   - Acesse [miniupnp.free.fr](http://miniupnp.free.fr/libnatpmp.html) e baixe o código-fonte do `libnatpmp`.
+2. **Compilar o natpmpc**:
+   - Instale um compilador C, como [MinGW](http://www.mingw.org/) ou [MSYS2](https://www.msys2.org/).
+   - No MSYS2, instale as dependências:
+     ```
+     pacman -S mingw-w64-x86_64-gcc
+     ```
+   - Extraia o código-fonte do `libnatpmp`, navegue até o diretório e compile:
+     ```
+     make
+     ```
+   - Isso gera o `natpmpc.exe`.
+3. **Adicionar natpmpc ao PATH**:
+   - Copie o `natpmpc.exe` para o mesmo diretório do `qbittorrent_port_updater.py` ou para um diretório incluído no PATH do sistema (ex.: `C:\Windows`).
+   - Para adicionar ao PATH:
+     - Pesquise por “Variáveis de Ambiente” no Windows.
+     - Edite a variável “Path” em “Variáveis do Sistema” ou “Variáveis do Usuário” e adicione o diretório contendo `natpmpc.exe`.
+   - Verifique executando:
+     ```
+     natpmpc
+     ```
+     Se não houver erro de “comando não encontrado”, está corretamente instalado.
+4. **Alternativa**:
+   - Se o `port-checker.py` lida com a detecção de porta sem o `natpmpc` (ex.: usando uma API da VPN), você não precisa do `natpmpc`. O script exibirá um aviso se o `natpmpc` estiver ausente, mas continuará se o `port-checker.py` funcionar.
+
+### 4. Configurar o qBittorrent
+1. **Instalar o qBittorrent**:
+   - Baixe e instale o qBittorrent em [qbittorrent.org](https://www.qbittorrent.org/download).
+2. **Ativar a Interface Web**:
+   - Abra o qBittorrent e vá para `Ferramentas > Preferências > Interface Web`.
+   - Marque “Ativar a Interface Web”.
+   - Anote o host (ex.: `http://localhost:8080`), nome de usuário e senha.
+   - Certifique-se de que o qBittorrent está em execução ao executar o script.
+3. **Testar o Acesso à Interface Web**:
+   - Abra um navegador e acesse a Interface Web (ex.: `http://localhost:8080`).
+   - Faça login com seu nome de usuário e senha para confirmar que está funcionando.
+
+### 5. Configurar o port-checker.py
+- Certifique-se de que o `port-checker.py` está no mesmo diretório do `qbittorrent_port_updater.py`.
+- Verifique se ele funciona no Windows executando:
+  ```
+  python port-checker.py
+  ```
+- Ele deve exibir algo como `The forwarded port is: 60661`.
+- Se o `port-checker.py` usa o `natpmpc`, certifique-se de que o `natpmpc.exe` está instalado (veja a etapa 3).
+- Se ele usa uma API da VPN ou outro método, confirme que o cliente VPN está em execução e configurado para redirecionamento de porta.
+
+### 6. Configurar a VPN
+- Certifique-se de que sua VPN (ex.: ProtonVPN) está instalada e em execução no Windows.
+- Ative o NAT-PMP ou redirecionamento de porta nas configurações do cliente VPN (consulte a documentação da sua VPN).
+- Teste o redirecionamento de porta executando o `port-checker.py` enquanto conectado à VPN.
+
+## Executando o Script
+1. **Colocar os Scripts**:
+   - Salve `qbittorrent_port_updater.py` e `port-checker.py` em um diretório (ex.: `C:\Users\SeuNome\wg-port-checker`).
+2. **Executar o Script**:
+   - Abra o Prompt de Comando ou PowerShell e navegue até o diretório:
+     ```
+     cd C:\Users\SeuNome\wg-port-checker
+     ```
+   - Execute o script:
+     ```
+     python qbittorrent_port_updater.py
+     ```
+   - Se `python` não funcionar, tente:
+     ```
+     py qbittorrent_port_updater.py
+     ```
+3. **Primeira Execução**:
+   - Se não houver um arquivo `.env`, o script solicitará o host, nome de usuário e senha da Interface Web do qBittorrent.
+   - Esses dados são salvos no arquivo `.env` para execuções futuras.
+   - Para redefinir as credenciais, delete o arquivo `.env` e execute o script novamente.
+4. **Comportamento Esperado**:
+   - O script verifica a porta redirecionada da VPN a cada 45 segundos usando o `port-checker.py`.
+   - Compara a porta redirecionada com a porta atual do qBittorrent e atualiza o qBittorrent se houver diferença.
+   - Os logs mostram carimbos de data/hora, portas detectadas, porta do qBittorrent e resultados das atualizações.
+
+## Exemplo de Saída
+```
+Este script usa port-checker.py para detectar a porta redirecionada da VPN WireGuard e atualiza o qBittorrent.
+Certifique-se de que port-checker.py está no mesmo diretório e que você está conectado à VPN.
+Credenciais carregadas do arquivo .env.
+Executando em loop para verificar a porta a cada 45 segundos. Pressione Ctrl+C para parar.
+
+[2025-10-24 15:45:00] Iniciando nova iteração do loop
+[2025-10-24 15:45:00] natpmpc não encontrado. Certifique-se de que está instalado ou verifique se port-checker.py lida com a detecção de porta independentemente.
+[2025-10-24 15:45:00] Porta redirecionada detectada: 60661
+[2025-10-24 15:45:00] Porta atual do qBittorrent: 12345
+[2025-10-24 15:45:00] Diferença de porta detectada. Porta redirecionada: 60661, Porta do qBittorrent: 12345
+[2025-10-24 15:45:00] Porta de escuta do qBittorrent definida com sucesso para 60661
+[2025-10-24 15:45:00] Porta do qBittorrent atualizada de 12345 para 60661
+```
+
+## Solução de Problemas
+1. **Falha no port-checker.py**:
+   - Execute `python port-checker.py` para verificar se ele exibe `The forwarded port is: <porta>`.
+   - Se ele depende do `natpmpc`, certifique-se de que o `natpmpc.exe` está instalado e no PATH.
+   - Verifique as configurações da VPN para redirecionamento de porta.
+
+2. **Erros no qBittorrent**:
+   - Se aparecer `qBittorrent login failed` ou `Error communicating with qBittorrent`, verifique:
+     - A Interface Web do qBittorrent está ativada e em execução.
+     - O host, nome de usuário e senha no arquivo `.env` estão corretos.
+     - Delete o arquivo `.env` e execute novamente para reinserir as credenciais.
+
+3. **natpmpc Não Encontrado**:
+   - Se o `port-checker.py` não requer o `natpmpc`, ignore o aviso.
+   - Caso contrário, instale o `natpmpc` conforme descrito na etapa 3 ou modifique o `port-checker.py` para usar uma API da VPN.
+
+4. **Problemas com a VPN**:
+   - Certifique-se de que a VPN está conectada e o NAT-PMP/redirecionamento de porta está ativado.
+   - Teste com o `port-checker.py` ou execute manualmente `natpmpc -g 10.2.0.1 -a 1 0 udp 60` (se instalado).
+
+5. **Problemas com o Comando Python**:
+   - Se `python` falhar, tente `py` ou `python3`.
+   - Verifique se o Python está no PATH executando `python --version`.
+
+## Notas
+- **Segurança**: O arquivo `.env` armazena as credenciais do qBittorrent em texto puro. Mantenha-o seguro e exclua-o de sistemas de controle de versão (ex.: adicione `.env` ao `.gitignore`).
+- **Estabilidade da Porta da VPN**: Algumas VPNs (ex.: ProtonVPN) podem reutilizar a mesma porta a menos que a conexão seja reiniciada. O script verifica a porta do qBittorrent em cada iteração para lidar com alterações externas.
+- **Modificações**: Se o `port-checker.py` lida com a detecção de porta sem o `natpmpc`, você pode remover a chamada ao `renew_natpmp_mapping()` comentando a linha no script:
+  ```python
+  # renew_natpmp_mapping()  # Ignorado, assumindo que port-checker.py lida com a detecção de porta
+  ```
+
+Para assistência adicional, compartilhe a saída do console e detalhes sobre sua configuração (ex.: provedor de VPN, versão do qBittorrent, versão do Python).
+
+
+
+
+
+
 # qBittorrent Port Updater
 
 This project contains a Python script (`qbittorrent_port_updater.py`) that detects the forwarded port from a WireGuard VPN (e.g., ProtonVPN) using `port-checker.py` and updates the qBittorrent listening port to match it. The script runs in a loop, checking the port every 45 seconds and updating qBittorrent if necessary. This README provides instructions for setting up and running the script on **Windows**.
