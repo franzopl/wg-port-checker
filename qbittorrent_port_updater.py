@@ -34,10 +34,22 @@ def save_env(host, username, password):
 
 def prompt_for_credentials():
     """Prompt user for qBittorrent credentials and save to .env."""
-    print("Please provide qBittorrent Web UI settings:")
-    host = input("Enter qBittorrent host (e.g., http://localhost:8080): ").strip() or 'http://localhost:8080'
-    username = input("Enter qBittorrent username: ").strip() or 'admin'
-    password = input("Enter qBittorrent password: ").strip() or 'adminadmin'
+    print("Por favor, forneça as configurações da interface Web do qBittorrent:")
+    print("(Pressione ENTER para usar os valores padrão)")
+    
+    default_host = 'http://localhost:8080'
+    default_username = 'admin'
+    default_password = 'adminadmin'
+    
+    print(f"Valor padrão para host: {default_host}")
+    host = input("Digite o host do qBittorrent: ").strip() or default_host
+    
+    print(f"Valor padrão para usuário: {default_username}")
+    username = input("Digite o nome de usuário do qBittorrent: ").strip() or default_username
+    
+    print(f"Valor padrão para senha: {default_password}")
+    password = input("Digite a senha do qBittorrent: ").strip() or default_password
+    
     save_env(host, username, password)
     return host, username, password
 
